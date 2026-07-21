@@ -1,13 +1,6 @@
-Here is your complete, fully integrated JavaScript code.
-
-All recommended fixes have been applied, including **XSS sanitization** on all dynamic table renderings, **date-based attendance tracking** (so historical attendance isn't overwritten daily), **safer form resets**, **unrestricted faculty dropdowns**, and **library fallback checks** for the PDF exporter.
-
-```javascript
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-
-// Your web app's Firebase configuration
+// ==========================================
+// FIREBASE INITIALIZATION (Compat / CDN Version)
+// ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyDWjJC06TO_6-HMp8dYLipzWSMOpTVKsgI",
   authDomain: "optimsystem-8bb47.firebaseapp.com",
@@ -19,9 +12,16 @@ const firebaseConfig = {
   measurementId: "G-8GZGF8EYGK"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// Initialize Firebase safely if loaded via CDN
+let database = null;
+if (typeof firebase !== 'undefined') {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  database = firebase.database();
+} else {
+  console.warn("Firebase SDKs not loaded. Running in local storage mode.");
+}
 
 // ==========================================
 // SECURITY & SANITIZATION HELPER
@@ -292,10 +292,10 @@ function renderAttendance() {
                     <td data-label="Student Name"><strong>${escapeHTML(s.name)}</strong></td>
                     <td data-label="Enrolled Batch">${escapeHTML(s.course)}</td>
                     <td data-label="Attendance Status">
-                        <span class="badge ${isPresent ? 'present' : 'absent'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
+                        <span class="badge ${isPresent ? 'paid' : 'pending'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
                     </td>
                     <td data-label="Update Action" class="no-pdf">
-                        <button class="action-btn" style="padding:4px 10px; font-size:0.75rem; background:${isPresent ? 'var(--danger)' : 'var(--success)'};" 
+                        <button class="action-btn" style="padding:4px 10px; font-size:0.75rem;" 
                             onclick="toggleStudentAttendance('${s.id}')">
                             Mark ${isPresent ? 'Absent' : 'Present'}
                         </button>
@@ -313,10 +313,10 @@ function renderAttendance() {
                     <td data-label="Staff/Faculty Name"><strong>${escapeHTML(st.name)}</strong></td>
                     <td data-label="Core Duty">${escapeHTML(st.duty)}</td>
                     <td data-label="Daily Status">
-                        <span class="badge ${isPresent ? 'present' : 'absent'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
+                        <span class="badge ${isPresent ? 'paid' : 'pending'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
                     </td>
                     <td data-label="Update Action" class="no-pdf">
-                        <button class="action-btn" style="padding:4px 10px; font-size:0.75rem; background:${isPresent ? 'var(--danger)' : 'var(--success)'};" 
+                        <button class="action-btn" style="padding:4px 10px; font-size:0.75rem;" 
                             onclick="toggleStaffAttendance('${st.id}')">
                             Mark ${isPresent ? 'Absent' : 'Present'}
                         </button>
@@ -491,7 +491,7 @@ function renderLedger() {
         <tr>
             <td data-label="Date">${escapeHTML(l.date)}</td>
             <td data-label="Type">
-                <span class="badge ${l.type === 'Income' ? 'paid' : 'absent'}">${escapeHTML(l.type.toUpperCase())}</span>
+                <span class="badge ${l.type === 'Income' ? 'paid' : 'pending'}">${escapeHTML(l.type.toUpperCase())}</span>
             </td>
             <td data-label="Category">${escapeHTML(l.cat)}</td>
             <td data-label="Description">${escapeHTML(l.desc) || '-'}</td>
@@ -542,10 +542,15 @@ function updateDashboardMetrics() {
 
     const totalCollected = studentCollected + ledgerIncome;
 
-    document.getElementById('dash-total-invoiced').innerText = '₹' + totalInvoiced.toLocaleString('en-IN');
-    document.getElementById('dash-total-collected').innerText = '₹' + totalCollected.toLocaleString('en-IN');
-    document.getElementById('dash-total-outstanding').innerText = '₹' + totalOutstanding.toLocaleString('en-IN');
-    document.getElementById('dash-total-expenses').innerText = '₹' + ledgerExpenses.toLocaleString('en-IN');
+    const dashInvoiced = document.getElementById('dash-total-invoiced');
+    const dashCollected = document.getElementById('dash-total-collected');
+    const dashOutstanding = document.getElementById('dash-total-outstanding');
+    const dashExpenses = document.getElementById('dash-total-expenses');
+
+    if (dashInvoiced) dashInvoiced.innerText = '₹' + totalInvoiced.toLocaleString('en-IN');
+    if (dashCollected) dashCollected.innerText = '₹' + totalCollected.toLocaleString('en-IN');
+    if (dashOutstanding) dashOutstanding.innerText = '₹' + totalOutstanding.toLocaleString('en-IN');
+    if (dashExpenses) dashExpenses.innerText = '₹' + ledgerExpenses.toLocaleString('en-IN');
 
     const today = getTodayKey();
     const currentStdAtt = studentAttendance[today] || {};
@@ -557,11 +562,16 @@ function updateDashboardMetrics() {
     const stfPresentCount = Object.values(currentStfAtt).filter(Boolean).length;
     const stfPct = staff.length ? Math.round((stfPresentCount / staff.length) * 100) : 0;
 
-    document.getElementById('dash-students-present').innerText = stdPresentCount;
-    document.getElementById('dash-student-pct').innerText = `${stdPct}% of registry (${students.length} total)`;
+    const dashStdPres = document.getElementById('dash-students-present');
+    const dashStdPct = document.getElementById('dash-student-pct');
+    const dashStfPres = document.getElementById('dash-staff-present');
+    const dashStfPct = document.getElementById('dash-staff-pct');
 
-    document.getElementById('dash-staff-present').innerText = stfPresentCount;
-    document.getElementById('dash-staff-pct').innerText = `${stfPct}% of registry (${staff.length} total)`;
+    if (dashStdPres) dashStdPres.innerText = stdPresentCount;
+    if (dashStdPct) dashStdPct.innerText = `${stdPct}% of registry (${students.length} total)`;
+
+    if (dashStfPres) dashStfPres.innerText = stfPresentCount;
+    if (dashStfPct) dashStfPct.innerText = `${stfPct}% of registry (${staff.length} total)`;
 
     const campusList = document.getElementById('active-on-campus-list');
     if (campusList) {
@@ -615,8 +625,10 @@ function updateInstallmentFormHelper() {
 function setMasterSortDirection(dir) {
     sortDirection = dir;
     ['student', 'staff', 'hours', 'ledger'].forEach(k => sortKeys[k].dir = dir);
-    document.getElementById('sort-desc-btn').classList.toggle('active', dir === 'desc');
-    document.getElementById('sort-asc-btn').classList.toggle('active', dir === 'asc');
+    const descBtn = document.getElementById('sort-desc-btn');
+    const ascBtn = document.getElementById('sort-asc-btn');
+    if (descBtn) descBtn.classList.toggle('active', dir === 'desc');
+    if (ascBtn) ascBtn.classList.toggle('active', dir === 'asc');
     renderAll();
 }
 
@@ -636,20 +648,25 @@ function saveToLocalStorage(showNotice = false) {
 }
 
 function openSidebar() {
-    document.getElementById('main-sidebar').classList.add('open');
-    document.getElementById('drawer-overlay').classList.add('active');
+    const sidebar = document.getElementById('main-sidebar');
+    const overlay = document.getElementById('drawer-overlay');
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
 }
 
 function closeSidebar() {
-    document.getElementById('main-sidebar').classList.remove('open');
-    document.getElementById('drawer-overlay').classList.remove('active');
+    const sidebar = document.getElementById('main-sidebar');
+    const overlay = document.getElementById('drawer-overlay');
+    if (sidebar) sidebar.classList.remove('open');
+    if (overlay) overlay.classList.remove('active');
 }
 
 function switchPane(paneId, navElement) {
     document.querySelectorAll('.portal-pane').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-links li').forEach(l => l.classList.remove('active'));
 
-    document.getElementById('pane-' + paneId).classList.add('active');
+    const targetPane = document.getElementById('pane-' + paneId);
+    if (targetPane) targetPane.classList.add('active');
     if (navElement) navElement.classList.add('active');
 
     const titleMap = {
@@ -659,7 +676,8 @@ function switchPane(paneId, navElement) {
         'faculty': 'Staff & Faculty Registry',
         'finance': 'Ledger (Inc / Exp)'
     };
-    document.getElementById('current-pane-title').innerText = titleMap[paneId] || 'Management Portal';
+    const titleEl = document.getElementById('current-pane-title');
+    if (titleEl) titleEl.innerText = titleMap[paneId] || 'Management Portal';
     closeSidebar();
 }
 
@@ -672,5 +690,3 @@ function filterTable(input, targetBodyId) {
         row.style.display = text.includes(filter) ? '' : 'none';
     });
 }
-
-```
