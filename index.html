@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optim International | Internal Management Portal v7.3</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- HTML2PDF Library for Exporting Reports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+    <!-- Drawer Backdrop Overlay -->
+    <div class="drawer-overlay" id="drawer-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Mobile Top Navigation Bar -->
+    <div class="mobile-header-bar">
+        <button class="mobile-toggle-btn" onclick="openSidebar()" aria-label="Open Menu">☰</button>
+        <h3 style="font-size:1.1rem; font-weight:700;">OPTIM INT'L</h3>
+        <div style="font-size:0.8rem; opacity:0.9;">v7.3</div>
+    </div>
+
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="main-sidebar">
+        <div class="logo-area">
+            <h2>OPTIM INT'L</h2>
+            <p>CMA USA | B.Com | Tuitions</p>
+        </div>
+        <ul class="nav-links">
+            <li class="active" id="nav-dashboard" onclick="switchPane('dashboard', this)">📊 Super Dashboard</li>
+            <li id="nav-students" onclick="switchPane('students', this)">🎓 Student Registry & Fees</li>
+            <li id="nav-attendance" onclick="switchPane('attendance', this)">📝 Live Attendance Tracker</li>
+            <li id="nav-faculty" onclick="switchPane('faculty', this)">👨‍🏫 Staff & Faculty Registry</li>
+            <li id="nav-finance" onclick="switchPane('finance', this)">💰 Ledger (Inc / Exp)</li>
+        </ul>
+    </aside>
+
+    <!-- MAIN PORTAL WINDOW -->
+    <main>
+        <header>
+            <div class="pane-title"><h2 id="current-pane-title">Super Dashboard</h2></div>
+            <div class="header-actions">
+                <div class="sort-pill-box">
+                    <button id="sort-desc-btn" class="sort-btn active" onclick="setMasterSortDirection('desc')">📅 Newest</button>
+                    <button id="sort-asc-btn" class="sort-btn" onclick="setMasterSortDirection('asc')">📅 Oldest</button>
+                </div>
+                <div class="toggle-container" onclick="toggleAutoSave()">
+                    <span id="auto-save-pill" class="toggle-pill active">Auto-Save: ON</span>
+                </div>
+                <button class="save-all-btn" onclick="saveToLocalStorage(true)">💾 Save</button>
+                <div class="user-profile">
+                    <span>User: Admin</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="content-area">
+
+            <!-- PANE 1: SUPER DASHBOARD OVERVIEW -->
+            <div id="pane-dashboard" class="portal-pane active">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <h3>Total Invoiced</h3>
+                        <p id="dash-total-invoiced">₹0</p>
+                    </div>
+                    <div class="metric-card success">
+                        <h3>Collected Cash</h3>
+                        <p id="dash-total-collected">₹0</p>
+                    </div>
+                    <div class="metric-card danger">
+                        <h3>Outstanding Fees</h3>
+                        <p id="dash-total-outstanding">₹0</p>
+                    </div>
+                    <div class="metric-card warning">
+                        <h3>Operational Expenses</h3>
+                        <p id="dash-total-expenses">₹0</p>
+                    </div>
+                </div>
+
+                <div class="dash-grid">
+                    <div class="campus-hub">
+                        <h3>📊 Campus Attendance Analytics</h3>
+                        <div class="metrics-grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 0;">
+                            <div class="metric-card" style="border-left-color: var(--success); padding: 15px;">
+                                <h3 style="font-size: 0.75rem;">Students Present</h3>
+                                <p id="dash-students-present" style="font-size: 1.3rem;">0</p>
+                                <span id="dash-student-pct" style="font-size:0.75rem; color:var(--text-muted)">0% of registry</span>
+                            </div>
+                            <div class="metric-card success" style="border-left-color: var(--primary-light); padding: 15px;">
+                                <h3 style="font-size: 0.75rem;">Staff & Faculty Present</h3>
+                                <p id="dash-staff-present" style="font-size: 1.3rem;">0</p>
+                                <span id="dash-staff-pct" style="font-size:0.75rem; color:var(--text-muted)">0% of registry</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="campus-hub">
+                        <h3>📍 Currently on Campus</h3>
+                        <ul class="presence-list" id="active-on-campus-list"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANE 2: STUDENT REGISTRY & FEES -->
+            <div id="pane-students" class="portal-pane">
+                <div class="form-grid-2">
+                    <div class="form-box">
+                        <h3>1. Register New Student Admission</h3>
+                        <div class="form-row" style="grid-template-columns: 1fr;">
+                            <div class="form-group"><label>Student Full Name</label><input type="text" id="stud-name" placeholder="Ex: Rahul K."></div>
+                            <div class="form-group">
+                                <label>Course Batch</label>
+                                <select id="stud-course">
+                                    <option value="CMA USA">CMA USA</option>
+                                    <option value="B.Com">B.Com Integrated</option>
+                                    <option value="Plus Two Commerce">Plus Two (+2) Commerce</option>
+                                    <option value="Plus One Commerce">Plus One (+1) Commerce</option>
+                                </select>
+                            </div>
+                            <div class="form-group"><label>Date Enrolled</label><input type="date" id="stud-date"></div>
+                            <div class="form-group"><label>Total Course Fee (₹)</label><input type="number" id="stud-fee" value="30000"></div>
+                            <div class="form-group"><label>Initial Paid Amount (₹)</label><input type="number" id="stud-paid" value="10000"></div>
+                        </div>
+                        <button class="action-btn" onclick="addStudent()" style="width:100%; margin-top:10px;">Register Student</button>
+                    </div>
+
+                    <div class="form-box" style="border-top: 4px solid var(--success);">
+                        <h3>2. Record Installment Payment</h3>
+                        <div class="form-row" style="grid-template-columns: 1fr;">
+                            <div class="form-group">
+                                <label>Select Registered Student</label>
+                                <select id="inst-student-select" onchange="updateInstallmentFormHelper()">
+                                    <option value="">-- Choose Student --</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="background:#f8fafc; padding:10px; border-radius:6px; margin: 5px 0;">
+                                <p style="font-size:0.8rem; color:var(--text-muted);">Current Selected Info:</p>
+                                <p id="inst-helper-info" style="font-size:0.9rem; font-weight:bold; color:var(--primary); margin-top:3px;">No student selected</p>
+                            </div>
+                            <div class="form-group"><label>Payment Date</label><input type="date" id="inst-date"></div>
+                            <div class="form-group"><label>Installment Paid Amount (₹)</label><input type="number" id="inst-amount" value="1000"></div>
+                        </div>
+                        <button class="action-btn" onclick="recordInstallment()" style="width:100%; margin-top:10px; background:var(--success);">Record Payment</button>
+                    </div>
+                </div>
+
+                <div class="table-container mobile-card-table">
+                    <div class="table-actions">
+                        <h4>Active Student Ledger</h4>
+                        <div class="filter-controls">
+                            <input type="text" class="search-input" placeholder="Search students..." onkeyup="filterTable(this, 'student-table-body')">
+                            <input type="date" id="stud-filter-start" class="date-filter-input" onchange="renderStudents()">
+                            <span>to</span>
+                            <input type="date" id="stud-filter-end" class="date-filter-input" onchange="renderStudents()">
+                            <button class="export-pdf-btn" onclick="exportTableToPDF('Student_Ledger_Report', 'student-report-container')">📄 Export PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive-wrapper" id="student-report-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th onclick="sortStudents('date')">Date Enrolled ⇕</th>
+                                    <th onclick="sortStudents('name')">Student Name ⇕</th>
+                                    <th onclick="sortStudents('course')">Enrolled Course ⇕</th>
+                                    <th onclick="sortStudents('fee')">Total Fee ⇕</th>
+                                    <th onclick="sortStudents('paid')">Total Paid ⇕</th>
+                                    <th>Balance Due</th>
+                                    <th>Financial Status</th>
+                                    <th class="no-pdf">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="student-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANE 3: ATTENDANCE TRACKER -->
+            <div id="pane-attendance" class="portal-pane">
+                <div style="display: flex; flex-direction: column; gap: 30px;">
+                    <div class="table-container mobile-card-table" style="margin-top:0;">
+                        <div class="table-actions">
+                            <h4>Student Attendance Tracker</h4>
+                            <div class="filter-controls">
+                                <input type="text" class="search-input" placeholder="Filter current view..." onkeyup="filterTable(this, 'attendance-students-body')">
+                                <button class="export-pdf-btn" onclick="exportTableToPDF('Student_Attendance_Report', 'attendance-student-report-container')">📄 Export PDF</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive-wrapper" id="attendance-student-report-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Student Name</th>
+                                        <th>Enrolled Batch</th>
+                                        <th>Attendance Status</th>
+                                        <th class="no-pdf">Update Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-students-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="table-container mobile-card-table" style="margin-top:0;">
+                        <div class="table-actions">
+                            <h4>Staff & Daily Faculty Attendance Tracker</h4>
+                            <div class="filter-controls">
+                                <input type="text" class="search-input" placeholder="Filter current view..." onkeyup="filterTable(this, 'attendance-staff-body')">
+                                <button class="export-pdf-btn" onclick="exportTableToPDF('Staff_Attendance_Report', 'attendance-staff-report-container')">📄 Export PDF</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive-wrapper" id="attendance-staff-report-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Staff/Faculty Name</th>
+                                        <th>Core Operations Duty</th>
+                                        <th>Daily Status</th>
+                                        <th class="no-pdf">Update Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-staff-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANE 4: STAFF & FACULTY REGISTRY -->
+            <div id="pane-faculty" class="portal-pane">
+                <div class="form-grid-2">
+                    <div class="form-box">
+                        <h3>1. Add New Staff / Faculty Member</h3>
+                        <div class="form-row" style="grid-template-columns: 1fr;">
+                            <div class="form-group"><label>Employee Name</label><input type="text" id="staff-name" placeholder="Ex: Prof. Harrison"></div>
+                            <div class="form-group"><label>Core Duty / Subject Area</label><input type="text" id="staff-duty" placeholder="Ex: CMA Law / Telecalling Coordinator"></div>
+                            <div class="form-group">
+                                <label>Employment Framework</label>
+                                <select id="staff-type">
+                                    <option value="Part Time Expert">Part Time Faculty</option>
+                                    <option value="Full Time Staff">Full Time Staff</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="action-btn" onclick="addStaff()" style="width: 100%; margin-top: 5px;">Register Team Member</button>
+                    </div>
+
+                    <div class="form-box" style="border-top: 4px solid var(--primary-light);">
+                        <h3>2. Log Daily Faculty Hours (Part-Time Only)</h3>
+                        <div class="form-row" style="grid-template-columns: 1fr;">
+                            <div class="form-group">
+                                <label>Select Part-Time Faculty</label>
+                                <select id="hour-faculty-select">
+                                    <option value="">-- Choose Faculty --</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Target Stream</label>
+                                <select id="hour-stream">
+                                    <option value="CMA USA">CMA USA</option>
+                                    <option value="Plus One">Plus One Commerce</option>
+                                    <option value="Plus Two">Plus Two Commerce</option>
+                                </select>
+                            </div>
+                            <div class="form-row" style="grid-template-columns: 1fr 1fr; margin-bottom: 0;">
+                                <div class="form-group"><label>Session Date</label><input type="date" id="hour-date"></div>
+                                <div class="form-group"><label>Hours</label><input type="number" step="0.1" id="hour-qty" value="1.5"></div>
+                            </div>
+                        </div>
+                        <button class="action-btn" onclick="logFacultyHours()" style="width: 100%; margin-top: 10px; background: var(--primary-light);">Log Hours Worked</button>
+                    </div>
+                </div>
+
+                <div class="form-grid-2" style="grid-template-columns: 1fr 1.2fr;">
+                    <div class="table-container mobile-card-table" style="margin-top: 0;">
+                        <div class="table-actions">
+                            <h4>Staff Roster Base</h4>
+                            <input type="text" class="search-input" style="width:140px;" placeholder="Filter..." onkeyup="filterTable(this, 'staff-registry-body')">
+                        </div>
+                        <div class="table-responsive-wrapper">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortStaff('name')">Team Member ⇕</th>
+                                        <th onclick="sortStaff('duty')">Role / Area ⇕</th>
+                                        <th onclick="sortStaff('type')">Type ⇕</th>
+                                        <th class="no-pdf">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="staff-registry-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="table-container mobile-card-table" style="margin-top: 0;">
+                        <div class="table-actions">
+                            <h4>Faculty Lecture Hour Logs</h4>
+                            <div class="filter-controls">
+                                <input type="date" id="hours-filter-start" class="date-filter-input" onchange="renderFacultyHours()">
+                                <span>to</span>
+                                <input type="date" id="hours-filter-end" class="date-filter-input" onchange="renderFacultyHours()">
+                                <button class="export-pdf-btn" onclick="exportTableToPDF('Faculty_Hours_Report', 'faculty-hours-report-container')">📄 PDF</button>
+                            </div>
+                        </div>
+                        <div class="table-responsive-wrapper" id="faculty-hours-report-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortHours('date')">Date ⇕</th>
+                                        <th onclick="sortHours('facultyName')">Faculty Member ⇕</th>
+                                        <th onclick="sortHours('stream')">Course Batch ⇕</th>
+                                        <th onclick="sortHours('hours')">Duration ⇕</th>
+                                        <th class="no-pdf">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="faculty-hours-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANE 5: LEDGER INCOME & EXPENSE -->
+            <div id="pane-finance" class="portal-pane">
+                <div class="form-box">
+                    <h3>Add Cashbook Entry</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Transaction Type</label>
+                            <select id="led-type">
+                                <option value="Income">Income (Cash Inflow)</option>
+                                <option value="Expense">Expense (Cash Outflow)</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Date of Transaction</label><input type="date" id="led-date"></div>
+                        <div class="form-group"><label>Category Tag</label><input type="text" id="led-cat" placeholder="e.g., Office Rent, Marketing"></div>
+                        <div class="form-group"><label>Transaction Description</label><input type="text" id="led-desc" placeholder="Details..."></div>
+                        <div class="form-group"><label>Amount (₹)</label><input type="number" id="led-amount" value="1000"></div>
+                    </div>
+                    <button class="action-btn" style="background:var(--success)" onclick="addLedgerEntry()">Record Cash Transaction</button>
+                </div>
+
+                <div class="table-container mobile-card-table">
+                    <div class="table-actions">
+                        <h4>Income & Expenditure Ledger</h4>
+                        <div class="filter-controls">
+                            <input type="text" class="search-input" placeholder="Search ledger..." onkeyup="filterTable(this, 'ledger-table-body')">
+                            <input type="date" id="ledger-filter-start" class="date-filter-input" onchange="renderLedger()">
+                            <span>to</span>
+                            <input type="date" id="ledger-filter-end" class="date-filter-input" onchange="renderLedger()">
+                            <button class="export-pdf-btn" onclick="exportTableToPDF('Cashbook_Ledger_Report', 'ledger-report-container')">📄 Export PDF</button>
+                        </div>
+                    </div>
+                    <div class="table-responsive-wrapper" id="ledger-report-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th onclick="sortLedger('date')">Date ⇕</th>
+                                    <th onclick="sortLedger('type')">Type ⇕</th>
+                                    <th onclick="sortLedger('cat')">Category ⇕</th>
+                                    <th>Description</th>
+                                    <th onclick="sortLedger('amount')">Amount (₹) ⇕</th>
+                                    <th class="no-pdf">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ledger-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
