@@ -1,11 +1,13 @@
+Here is your complete, fully integrated JavaScript code.
+
+All recommended fixes have been applied, including **XSS sanitization** on all dynamic table renderings, **date-based attendance tracking** (so historical attendance isn't overwritten daily), **safer form resets**, **unrestricted faculty dropdowns**, and **library fallback checks** for the PDF exporter.
+
+```javascript
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
 // Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyDWjJC06TO_6-HMp8dYLipzWSMOpTVKsgI",
   authDomain: "optimsystem-8bb47.firebaseapp.com",
@@ -20,6 +22,24 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
+
+// ==========================================
+// SECURITY & SANITIZATION HELPER
+// ==========================================
+function escapeHTML(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function getTodayKey() {
+    return new Date().toISOString().split('T')[0];
+}
+
 // ==========================================
 // STATE MANAGEMENT & LOCAL STORAGE
 // ==========================================
@@ -27,6 +47,8 @@ let students = JSON.parse(localStorage.getItem('optim_students')) || [];
 let staff = JSON.parse(localStorage.getItem('optim_staff')) || [];
 let facultyHours = JSON.parse(localStorage.getItem('optim_hours')) || [];
 let ledger = JSON.parse(localStorage.getItem('optim_ledger')) || [];
+
+// Attendance stored as date-indexed maps: { "YYYY-MM-DD": { "ID": boolean } }
 let studentAttendance = JSON.parse(localStorage.getItem('optim_std_att')) || {};
 let staffAttendance = JSON.parse(localStorage.getItem('optim_stf_att')) || {};
 
@@ -43,7 +65,7 @@ let sortKeys = {
 
 // Initialize App on DOM Load
 document.addEventListener('DOMContentLoaded', () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayKey();
     ['stud-date', 'inst-date', 'hour-date', 'led-date'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = today;
@@ -129,8 +151,8 @@ function addStudent() {
     renderAll();
 
     document.getElementById('stud-name').value = '';
-    document.getElementById('stud-fee').value = '30000';
-    document.getElementById('stud-paid').value = '10000';
+    document.getElementById('stud-fee').value = '';
+    document.getElementById('stud-paid').value = '';
 }
 
 function recordInstallment() {
@@ -148,13 +170,19 @@ function recordInstallment() {
         saveAllData();
         renderAll();
         updateInstallmentFormHelper();
+        document.getElementById('inst-amount').value = '';
     }
 }
 
 function deleteStudent(id) {
     if (confirm('Delete student record?')) {
         students = students.filter(s => s.id !== id);
-        delete studentAttendance[id];
+        
+        // Clean up date-indexed attendance records
+        Object.keys(studentAttendance).forEach(d => {
+            if (studentAttendance[d]) delete studentAttendance[d][id];
+        });
+
         saveAllData();
         renderAll();
     }
@@ -183,14 +211,17 @@ function renderStudents() {
         const historyRowId = `hist-row-${s.id}`;
 
         const installmentRows = s.installments.length > 0 ? s.installments.map(ins => `
-            <tr><td>${ins.date}</td><td>₹${ins.amount.toLocaleString('en-IN')}</td></tr>
+            <tr>
+                <td>${escapeHTML(ins.date)}</td>
+                <td>₹${ins.amount.toLocaleString('en-IN')}</td>
+            </tr>
         `).join('') : '<tr><td colspan="2">No installments logged yet.</td></tr>';
 
         return `
             <tr>
-                <td data-label="Date Enrolled">${s.date}</td>
-                <td data-label="Student Name"><strong>${s.name}</strong></td>
-                <td data-label="Course">${s.course}</td>
+                <td data-label="Date Enrolled">${escapeHTML(s.date)}</td>
+                <td data-label="Student Name"><strong>${escapeHTML(s.name)}</strong></td>
+                <td data-label="Course">${escapeHTML(s.course)}</td>
                 <td data-label="Total Fee">₹${s.fee.toLocaleString('en-IN')}</td>
                 <td data-label="Total Paid">₹${s.paid.toLocaleString('en-IN')}</td>
                 <td data-label="Balance Due">₹${balance.toLocaleString('en-IN')}</td>
@@ -205,7 +236,7 @@ function renderStudents() {
             <tr id="${historyRowId}" class="history-row">
                 <td colspan="8">
                     <div class="history-box">
-                        <h5>Payment Breakout History — ${s.name}</h5>
+                        <h5>Payment Breakout History — ${escapeHTML(s.name)}</h5>
                         <table class="history-table">
                             <thead><tr><th>Date Paid</th><th>Amount (₹)</th></tr></thead>
                             <tbody>${installmentRows}</tbody>
@@ -223,17 +254,23 @@ function toggleHistoryRow(rowId) {
 }
 
 // ==========================================
-// 2. ATTENDANCE TRACKER
+// 2. ATTENDANCE TRACKER (DATE-INDEXED)
 // ==========================================
 function toggleStudentAttendance(id) {
-    studentAttendance[id] = !studentAttendance[id];
+    const today = getTodayKey();
+    if (!studentAttendance[today]) studentAttendance[today] = {};
+    
+    studentAttendance[today][id] = !studentAttendance[today][id];
     saveAllData();
     renderAttendance();
     updateDashboardMetrics();
 }
 
 function toggleStaffAttendance(id) {
-    staffAttendance[id] = !staffAttendance[id];
+    const today = getTodayKey();
+    if (!staffAttendance[today]) staffAttendance[today] = {};
+    
+    staffAttendance[today][id] = !staffAttendance[today][id];
     saveAllData();
     renderAttendance();
     updateDashboardMetrics();
@@ -242,14 +279,18 @@ function toggleStaffAttendance(id) {
 function renderAttendance() {
     const stdBody = document.getElementById('attendance-students-body');
     const stfBody = document.getElementById('attendance-staff-body');
+    const today = getTodayKey();
+
+    const currentStdAtt = studentAttendance[today] || {};
+    const currentStfAtt = staffAttendance[today] || {};
 
     if (stdBody) {
         stdBody.innerHTML = students.map(s => {
-            const isPresent = !!studentAttendance[s.id];
+            const isPresent = !!currentStdAtt[s.id];
             return `
                 <tr>
-                    <td data-label="Student Name"><strong>${s.name}</strong></td>
-                    <td data-label="Enrolled Batch">${s.course}</td>
+                    <td data-label="Student Name"><strong>${escapeHTML(s.name)}</strong></td>
+                    <td data-label="Enrolled Batch">${escapeHTML(s.course)}</td>
                     <td data-label="Attendance Status">
                         <span class="badge ${isPresent ? 'present' : 'absent'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
                     </td>
@@ -266,11 +307,11 @@ function renderAttendance() {
 
     if (stfBody) {
         stfBody.innerHTML = staff.map(st => {
-            const isPresent = !!staffAttendance[st.id];
+            const isPresent = !!currentStfAtt[st.id];
             return `
                 <tr>
-                    <td data-label="Staff/Faculty Name"><strong>${st.name}</strong></td>
-                    <td data-label="Core Duty">${st.duty}</td>
+                    <td data-label="Staff/Faculty Name"><strong>${escapeHTML(st.name)}</strong></td>
+                    <td data-label="Core Duty">${escapeHTML(st.duty)}</td>
                     <td data-label="Daily Status">
                         <span class="badge ${isPresent ? 'present' : 'absent'}">${isPresent ? 'PRESENT' : 'ABSENT'}</span>
                     </td>
@@ -307,7 +348,11 @@ function addStaff() {
 function deleteStaff(id) {
     if (confirm('Delete team member?')) {
         staff = staff.filter(st => st.id !== id);
-        delete staffAttendance[id];
+        
+        Object.keys(staffAttendance).forEach(d => {
+            if (staffAttendance[d]) delete staffAttendance[d][id];
+        });
+
         saveAllData();
         renderAll();
     }
@@ -330,6 +375,7 @@ function logFacultyHours() {
 
     saveAllData();
     renderFacultyHours();
+    document.getElementById('hour-qty').value = '';
 }
 
 function deleteFacultyHour(id) {
@@ -365,9 +411,9 @@ function renderStaff() {
     let list = sortData([...staff], sortKeys.staff.col, sortKeys.staff.dir);
     tbody.innerHTML = list.map(st => `
         <tr>
-            <td data-label="Team Member"><strong>${st.name}</strong></td>
-            <td data-label="Role / Area">${st.duty}</td>
-            <td data-label="Type">${st.type}</td>
+            <td data-label="Team Member"><strong>${escapeHTML(st.name)}</strong></td>
+            <td data-label="Role / Area">${escapeHTML(st.duty)}</td>
+            <td data-label="Type">${escapeHTML(st.type)}</td>
             <td data-label="Action" class="no-pdf">
                 <button class="delete-btn" onclick="deleteStaff('${st.id}')">🗑️</button>
             </td>
@@ -384,9 +430,9 @@ function renderFacultyHours() {
 
     tbody.innerHTML = list.map(h => `
         <tr>
-            <td data-label="Date">${h.date}</td>
-            <td data-label="Faculty Member"><strong>${h.facultyName}</strong></td>
-            <td data-label="Course Batch">${h.stream}</td>
+            <td data-label="Date">${escapeHTML(h.date)}</td>
+            <td data-label="Faculty Member"><strong>${escapeHTML(h.facultyName)}</strong></td>
+            <td data-label="Course Batch">${escapeHTML(h.stream)}</td>
             <td data-label="Duration">${h.hours} hrs</td>
             <td data-label="Action" class="no-pdf">
                 <button class="delete-btn" onclick="deleteFacultyHour('${h.id}')">🗑️</button>
@@ -413,7 +459,7 @@ function addLedgerEntry() {
 
     document.getElementById('led-cat').value = '';
     document.getElementById('led-desc').value = '';
-    document.getElementById('led-amount').value = '1000';
+    document.getElementById('led-amount').value = '';
 }
 
 function deleteLedgerEntry(id) {
@@ -443,12 +489,12 @@ function renderLedger() {
 
     tbody.innerHTML = list.map(l => `
         <tr>
-            <td data-label="Date">${l.date}</td>
+            <td data-label="Date">${escapeHTML(l.date)}</td>
             <td data-label="Type">
-                <span class="badge ${l.type === 'Income' ? 'paid' : 'absent'}">${l.type.toUpperCase()}</span>
+                <span class="badge ${l.type === 'Income' ? 'paid' : 'absent'}">${escapeHTML(l.type.toUpperCase())}</span>
             </td>
-            <td data-label="Category">${l.cat}</td>
-            <td data-label="Description">${l.desc || '-'}</td>
+            <td data-label="Category">${escapeHTML(l.cat)}</td>
+            <td data-label="Description">${escapeHTML(l.desc) || '-'}</td>
             <td data-label="Amount">₹${l.amount.toLocaleString('en-IN')}</td>
             <td data-label="Action" class="no-pdf">
                 <button class="delete-btn" onclick="deleteLedgerEntry('${l.id}')">🗑️</button>
@@ -461,6 +507,10 @@ function renderLedger() {
 // 5. EXPORT TO PDF FUNCTIONALITY
 // ==========================================
 function exportTableToPDF(filename, containerId) {
+    if (typeof html2pdf === 'undefined') {
+        return alert('PDF export library is loading or missing. Please ensure internet access and refresh.');
+    }
+
     const element = document.getElementById(containerId);
     if (!element) return;
 
@@ -468,7 +518,7 @@ function exportTableToPDF(filename, containerId) {
 
     const opt = {
         margin:       [10, 10, 10, 10],
-        filename:     `${filename}_${new Date().toISOString().split('T')[0]}.pdf`,
+        filename:     `${filename}_${getTodayKey()}.pdf`,
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2 },
         jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
@@ -479,7 +529,9 @@ function exportTableToPDF(filename, containerId) {
     });
 }
 
-// Dashboard Analytics & Helpers
+// ==========================================
+// DASHBOARD ANALYTICS & HELPERS
+// ==========================================
 function updateDashboardMetrics() {
     const totalInvoiced = students.reduce((acc, s) => acc + (s.fee || 0), 0);
     const studentCollected = students.reduce((acc, s) => acc + (s.paid || 0), 0);
@@ -495,10 +547,14 @@ function updateDashboardMetrics() {
     document.getElementById('dash-total-outstanding').innerText = '₹' + totalOutstanding.toLocaleString('en-IN');
     document.getElementById('dash-total-expenses').innerText = '₹' + ledgerExpenses.toLocaleString('en-IN');
 
-    const stdPresentCount = Object.values(studentAttendance).filter(Boolean).length;
+    const today = getTodayKey();
+    const currentStdAtt = studentAttendance[today] || {};
+    const currentStfAtt = staffAttendance[today] || {};
+
+    const stdPresentCount = Object.values(currentStdAtt).filter(Boolean).length;
     const stdPct = students.length ? Math.round((stdPresentCount / students.length) * 100) : 0;
 
-    const stfPresentCount = Object.values(staffAttendance).filter(Boolean).length;
+    const stfPresentCount = Object.values(currentStfAtt).filter(Boolean).length;
     const stfPct = staff.length ? Math.round((stfPresentCount / staff.length) * 100) : 0;
 
     document.getElementById('dash-students-present').innerText = stdPresentCount;
@@ -511,13 +567,13 @@ function updateDashboardMetrics() {
     if (campusList) {
         let items = [];
         students.forEach(s => {
-            if (studentAttendance[s.id]) {
-                items.push(`<li class="presence-item"><span>🎓 ${s.name}</span> <span class="role">${s.course}</span></li>`);
+            if (currentStdAtt[s.id]) {
+                items.push(`<li class="presence-item"><span>🎓 ${escapeHTML(s.name)}</span> <span class="role">${escapeHTML(s.course)}</span></li>`);
             }
         });
         staff.forEach(st => {
-            if (staffAttendance[st.id]) {
-                items.push(`<li class="presence-item"><span>👨‍🏫 ${st.name}</span> <span class="role">${st.duty}</span></li>`);
+            if (currentStfAtt[st.id]) {
+                items.push(`<li class="presence-item"><span>👨‍🏫 ${escapeHTML(st.name)}</span> <span class="role">${escapeHTML(st.duty)}</span></li>`);
             }
         });
         campusList.innerHTML = items.length > 0 ? items.join('') : '<li class="presence-item" style="color:var(--text-muted)">No students or staff currently marked present.</li>';
@@ -529,18 +585,15 @@ function populateDropdowns() {
     if (instSelect) {
         const currentVal = instSelect.value;
         instSelect.innerHTML = '<option value="">-- Choose Student --</option>' + 
-            students.map(s => `<option value="${s.id}">${s.name} (${s.course})</option>`).join('');
+            students.map(s => `<option value="${s.id}">${escapeHTML(s.name)} (${escapeHTML(s.course)})</option>`).join('');
         instSelect.value = currentVal;
     }
 
     const hourSelect = document.getElementById('hour-faculty-select');
     if (hourSelect) {
         const currentVal = hourSelect.value;
-        const targetList = staff.filter(st => st.type === 'Part Time Expert' || st.type === 'Part Time Faculty');
-        const listToUse = targetList.length ? targetList : staff;
-
         hourSelect.innerHTML = '<option value="">-- Choose Faculty --</option>' + 
-            listToUse.map(st => `<option value="${st.id}">${st.name} - ${st.duty}</option>`).join('');
+            staff.map(st => `<option value="${st.id}">${escapeHTML(st.name)} - ${escapeHTML(st.duty)}</option>`).join('');
         hourSelect.value = currentVal;
     }
 }
@@ -619,3 +672,5 @@ function filterTable(input, targetBodyId) {
         row.style.display = text.includes(filter) ? '' : 'none';
     });
 }
+
+```
